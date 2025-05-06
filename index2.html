@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Журнал оценок</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6fa; margin: 0; }
+        .tabs { display: flex; background: #2c3e50; }
+        .tab { padding: 16px 24px; color: #fff; cursor: pointer; transition: 0.2s; border: none; background: none; font-size: 16px;}
+        .tab.active, .tab:hover { background: #34495e; }
+        .tab-content { padding: 32px; background: #fff; border-radius: 0 0 8px 8px; margin: 0 16px 16px 16px; box-shadow: 0 2px 8px #0001;}
+        h2 { color: #2c3e50; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; background: #fafbfc;}
+        th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left;}
+        th { background: #eaeaea;}
+        tr:nth-child(even) { background: #f4f6fa;}
+        input, select, button { padding: 8px; margin: 4px; border-radius: 4px; border: 1px solid #bbb;}
+        button { background: #2c3e50; color: #fff; border: none; cursor: pointer;}
+        button:hover { background: #34495e;}
+        .form-row { display: flex; gap: 8px; margin-bottom: 8px;}
+        .actions { display: flex; gap: 8px;}
+        .photo { border-radius: 50%; width: 120px; margin-bottom: 16px;}
+        @media (max-width: 700px) {
+            .tab-content { padding: 8px; }
+            .form-row { flex-direction: column; }
+        }
+        .subject-input { width: 80px; }
+        .chart-container { margin-top: 20px; }
+        .chart-row { display: flex; flex-wrap: wrap; gap: 20px; }
+        .chart-wrapper { flex: 1; min-width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="tabs">
+        <button class="tab active" onclick="showTab(0)">Загрузка</button>
+        <button class="tab" onclick="showTab(1)">Журнал</button>
+        <button class="tab" onclick="showTab(2)">Статистика (таблица)</button>
+        <button class="tab" onclick="showTab(3)">Статистика (графики)</button>
+        <button class="tab" onclick="showTab(4)">Помощь</button>
+        <button class="tab" onclick="showTab(5)">О программе</button>
+    </div>
+    <div id="tab-0" class="tab-content">
+        <h2>Загрузка оценок из файла</h2>
+        <input type="file" id="fileInput" accept=".csv,.txt,.xlsx">
+        <button onclick="clearTable()">Очистить</button>
+        <div id="uploadTable"></div>
+    </div>
+    <div id="tab-1" class="tab-content" style="display:none">
+        <h2>Журнал оценок</h2>
+        <div class="form-row">
+            <input type="text" id="fio" placeholder="ФИО">
+            <input type="text" id="class" placeholder="Класс">
+            <input type="number" class="subject-input" id="informatics" placeholder="Информатика" min="2" max="5">
+            <input type="number" class="subject-input" id="physics" placeholder="Физика" min="2" max="5">
+            <input type="number" class="subject-input" id="math" placeholder="Математика" min="2" max="5">
+            <input type="number" class="subject-input" id="literature" placeholder="Литература" min="2" max="5">
+            <input type="number" class="subject-input" id="music" placeholder="Музыка" min="2" max="5">
+            <button onclick="addOrUpdate()">Добавить/Сохранить</button>
+        </div>
+        <div id="editInfo"></div>
+        <div id="journalTable"></div>
+        <button onclick="saveToCSV()">Сохранить в CSV</button>
+        <button onclick="saveToTXT()">Сохранить в TXT</button>
+        <button onclick="saveToXLSX()">Сохранить в XLSX</button>
+    </div>
+    <div id="tab-2" class="tab-content" style="display:none">
+        <h2>Статистика (таблица)</h2>
+        <div id="statTable"></div>
+    </div>
+    <div id="tab-3" class="tab-content" style="display:none">
+        <h2>Статистика (графики)</h2>
+        <div class="chart-row">
+            <div class="chart-wrapper">
+                <h3>Статистика по предметам (все классы)</h3>
+                <canvas id="statChart" height="200"></canvas>
+            </div>
+            <div class="chart-wrapper">
+                <h3>Статистика по классам</h3>
+                <select id="classSelect" onchange="renderClassChart(this.value)" style="width: 100%; margin-bottom: 10px;">
+                    <option value="">Выберите класс</option>
+                </select>
+                <canvas id="classChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div id="tab-4" class="tab-content" style="display:none">
+        <h2>Помощь</h2>
+        <ul>
+            <li><b>Загрузка:</b> Загрузите файл с оценками (.csv, .txt, .xlsx). Таблица появится ниже. Файл должен содержать столбцы: ФИО, Класс, Информатика, Физика, Математика, Литература, Музыка.</li>
+            <li><b>Журнал:</b> Добавляйте, редактируйте или удаляйте оценки. Можно сохранить журнал в CSV.</li>
+            <li><b>Статистика (таблица):</b> Сводные данные по классам и предметам.</li>
+            <li><b>Статистика (графики):</b> Визуализация статистики по оценкам.</li>
+            <li><b>О программе:</b> Информация о разработчике.</li>
+        </ul>
+    </div>
+    <div id="tab-5" class="tab-content" style="display:none">
+        <h2>О программе</h2>
+        <img src="https://sun9-51.userapi.com/s/v1/ig2/Wn7QtIwqK0fBZv8vlt1Z0jauIvcuXT2RZErSslf-dG8n8GoVtlkKNbDM0bA264lyCoN_y2uBgIASRgOUWE1181LP.jpg?size=400x400&quality=95&crop=297,439,1356,1356&ava=1" class="photo" alt="Фото разработчика">
+        <p><b>Разработчик:</b> Солеева Полина Леонидовна</p>
+        <p><b>Email:</b> <a href="mailto:psoleeva@mail.ru">psoleeva@mail.ru</a></p>
+        <p><b>Телефон:</b> +7 907 666 98 09</p>
+    </div>
+    <script>
+        function showTab(idx) {
+            document.querySelectorAll('.tab-content').forEach((el, i) => el.style.display = i === idx ? '' : 'none');
+            document.querySelectorAll('.tab').forEach((el, i) => el.classList.toggle('active', i === idx));
+            if(idx === 1) renderJournal();
+            if(idx === 2) renderStatTable();
+            if(idx === 3) {
+                renderStatChart();
+                fillClassSelect();
+            }
+            if(idx === 4) renderStatChart();
+        }
+
+        // Данные журнала
+        let journal = [];
+        let editIndex = null;
+        const subjects = ["Информатика", "Физика", "Математика", "Литература", "Музыка"];
+        const requiredHeaders = ["ФИО", "Класс", ...subjects];
+
+        // Загрузка файла
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            let file = e.target.files[0];
+            if(!file) return;
+            let ext = file.name.split('.').pop().toLowerCase();
+            if(['csv','txt'].includes(ext)) {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    let text = e.target.result;
+                    let rows = text.split(/\r?\n/).filter(Boolean).map(row => row.split(/[;,]/));
+                    processRows(rows);
+                };
+                reader.readAsText(file);
+            } else if(ext === 'xlsx') {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    let data = new Uint8Array(e.target.result);
+                    let workbook = XLSX.read(data, {type: 'array'});
+                    let sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    let rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+                    processRows(rows);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Поддерживаются только .csv, .txt, .xlsx');
+            }
+        });
+
+        function processRows(rows) {
+            if (rows.length === 0) {
+                alert('Файл пустой');
+                return;
+            }
+            const headers = rows[0].map(h => h.trim());
+            const missing = requiredHeaders.filter(h => !headers.includes(h));
+            if (missing.length > 0) {
+                alert('В файле отсутствуют колонки: ' + missing.join(', '));
+                return;
+            }
+            // Индексы
+            let idx = {};
+            requiredHeaders.forEach(h => { idx[h] = headers.indexOf(h); });
+            let loaded = [];
+            for(let i=1; i<rows.length; ++i) {
+                let r = rows[i];
+                if(r.length < headers.length) continue;
+                let entry = {
+                    fio: r[idx["ФИО"]],
+                    class: r[idx["Класс"]],
+                };
+                subjects.forEach(s => entry[s] = parseInt(r[idx[s]]));
+                loaded.push(entry);
+            }
+            journal = loaded;
+            renderUploadTable();
+            renderJournal();
+        }
+
+        function renderUploadTable() {
+            let html = '<table><tr><th>ФИО</th><th>Класс</th>';
+            subjects.forEach(s => html += `<th>${s}</th>`);
+            html += '</tr>';
+            for(let row of journal)
+                html += `<tr><td>${row.fio}</td><td>${row.class}</td>${subjects.map(s=>`<td>${row[s]}</td>`).join('')}</tr>`;
+            html += '</table>';
+            document.getElementById('uploadTable').innerHTML = html;
+        }
+
+        function clearTable() {
+            journal = [];
+            renderUploadTable();
+            renderJournal();
+        }
+
+        // Журнал: добавить/редактировать
+        function addOrUpdate() {
+            let fio = document.getElementById('fio').value.trim();
+            let cls = document.getElementById('class').value.trim();
+            let entry = {fio, class: cls};
+            let valid = fio && cls;
+            subjects.forEach(s => {
+                let val = parseInt(document.getElementById(subjectToId(s)).value);
+                entry[s] = val;
+                if(isNaN(val) || val<2 || val>5) valid = false;
+            });
+            if(!valid) {
+                alert('Проверьте правильность ввода!');
+                return;
+            }
+            if(editIndex !== null) {
+                journal[editIndex] = entry;
+                editIndex = null;
+                document.getElementById('editInfo').innerHTML = '';
+            } else {
+                journal.push(entry);
+            }
+            document.getElementById('fio').value = '';
+            document.getElementById('class').value = '';
+            subjects.forEach(s=>document.getElementById(subjectToId(s)).value='');
+            renderJournal();
+            renderUploadTable();
+        }
+        function subjectToId(s) {
+            return {
+                "Информатика":"informatics",
+                "Физика":"physics",
+                "Математика":"math",
+                "Литература":"literature",
+                "Музыка":"music"
+            }[s];
+        }
+
+        function renderJournal() {
+            let html = '<table><tr><th>ФИО</th><th>Класс</th>';
+            subjects.forEach(s => html += `<th>${s}</th>`);
+            html += '<th>Действия</th></tr>';
+            journal.forEach((row, i) => {
+                html += `<tr>
+                    <td>${row.fio}</td>
+                    <td>${row.class}</td>
+                    ${subjects.map(s=>`<td>${row[s]}</td>`).join('')}
+                    <td class="actions">
+                        <button onclick="editRow(${i})">✎</button>
+                        <button onclick="deleteRow(${i})">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('journalTable').innerHTML = html;
+        }
+
+        function editRow(i) {
+            let row = journal[i];
+            document.getElementById('fio').value = row.fio;
+            document.getElementById('class').value = row.class;
+            subjects.forEach(s=>document.getElementById(subjectToId(s)).value=row[s]);
+            editIndex = i;
+            document.getElementById('editInfo').innerHTML = 'Редактирование записи. После изменений нажмите "Добавить/Сохранить".';
+        }
+
+        function deleteRow(i) {
+            if(confirm('Удалить запись?')) {
+                journal.splice(i,1);
+                renderJournal();
+                renderUploadTable();
+            }
+        }
+
+        // Сохранить в CSV
+        function saveToCSV() {
+            if (!journal || !journal.length) return alert("Нет данных для сохранения!");
+            const headers = Object.keys(journal[0]);
+            const rows = journal.map(obj => headers.map(h => obj[h] ?? '').join(';'));
+            const csv = [headers.join(';'), ...rows].join('\r\n');
+            downloadFile(csv, 'journal.csv', 'text/csv');
+        }
+
+        function saveToTXT() {
+            if (!journal || !journal.length) return alert("Нет данных для сохранения!");
+            const headers = Object.keys(journal[0]);
+            const rows = journal.map(obj => headers.map(h => obj[h] ?? '').join(';'));
+            const txt = [headers.join(';'), ...rows].join('\r\n');
+            downloadFile(txt, 'journal.txt', 'text/plain');
+        }
+
+        function saveToXLSX() {
+            if (!journal || !journal.length) return alert("Нет данных для сохранения!");
+            const ws = XLSX.utils.json_to_sheet(journal);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Журнал");
+            const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+            const blob = new Blob([wbout], {type: "application/octet-stream"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "journal.xlsx";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+        }
+
+        // Универсальная функция для скачивания
+        function downloadFile(data, filename, mime) {
+            const blob = new Blob([data], {type: mime});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+        }
+
+        // Статистика
+        function renderStatTable() {
+            // Для каждого класса и предмета
+            let byClass = {};
+            journal.forEach(r=>{
+                if(!byClass[r.class]) byClass[r.class]={};
+                subjects.forEach(s=>{
+                    if(!byClass[r.class][s]) byClass[r.class][s]=[];
+                    byClass[r.class][s].push(r[s]);
+                });
+            });
+            let html = '<h3>По классам и предметам</h3><table><tr><th>Класс</th><th>Предмет</th><th>Средняя</th><th>Медиана</th><th>Кол-во</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>';
+            for(let cls in byClass) {
+                for(let s of subjects) {
+                    let grades = byClass[cls][s]||[];
+                    html += `<tr>
+                        <td>${cls}</td>
+                        <td>${s}</td>
+                        <td>${avg(grades).toFixed(2)}</td>
+                        <td>${median(grades)}</td>
+                        <td>${grades.length}</td>
+                        <td>${count(grades,2)} (${perc(grades,2)}%)</td>
+                        <td>${count(grades,3)} (${perc(grades,3)}%)</td>
+                        <td>${count(grades,4)} (${perc(grades,4)}%)</td>
+                        <td>${count(grades,5)} (${perc(grades,5)}%)</td>
+                    </tr>`;
+                }
+            }
+            html += '</table>';
+
+            // Среди всех учеников для каждого предмета
+            let bySubject = {};
+            subjects.forEach(s=>bySubject[s]=[]);
+            journal.forEach(r=>{
+                subjects.forEach(s=>bySubject[s].push(r[s]));
+            });
+            html += '<h3>По предметам (все классы)</h3><table><tr><th>Предмет</th><th>Средняя</th><th>Медиана</th><th>Кол-во</th><th>2</th><th>3</th><th>4</th><th>5</th></tr>';
+            for(let s of subjects) {
+                let grades = bySubject[s];
+                html += `<tr>
+                    <td>${s}</td>
+                    <td>${avg(grades).toFixed(2)}</td>
+                    <td>${median(grades)}</td>
+                    <td>${grades.length}</td>
+                    <td>${count(grades,2)} (${perc(grades,2)}%)</td>
+                    <td>${count(grades,3)} (${perc(grades,3)}%)</td>
+                    <td>${count(grades,4)} (${perc(grades,4)}%)</td>
+                    <td>${count(grades,5)} (${perc(grades,5)}%)</td>
+                </tr>`;
+            }
+            html += '</table>';
+            document.getElementById('statTable').innerHTML = html;
+        }
+
+        // Статистика - графики
+        let chart;
+        let classChart;
+        
+        function fillClassSelect() {
+            const select = document.getElementById('classSelect');
+            select.innerHTML = '<option value="">Выберите класс</option>';
+            
+            // Получаем уникальные классы
+            const classes = [...new Set(journal.map(item => item.class))].sort();
+            
+            classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls;
+                option.textContent = cls;
+                select.appendChild(option);
+            });
+            
+            // Если есть классы, выбираем первый по умолчанию
+            if (classes.length > 0) {
+                select.value = classes[0];
+                renderClassChart(classes[0]);
+            }
+        }
+        
+        function renderClassChart(selectedClass) {
+            if (!selectedClass) return;
+            
+            // Фильтруем данные по выбранному классу
+            const classData = journal.filter(item => item.class === selectedClass);
+            
+            // Подготовка данных для графика
+            const gradeCounts = {
+                '2': subjects.map(subj => countGrades(classData, subj, 2)),
+                '3': subjects.map(subj => countGrades(classData, subj, 3)),
+                '4': subjects.map(subj => countGrades(classData, subj, 4)),
+                '5': subjects.map(subj => countGrades(classData, subj, 5))
+            };
+            
+            const ctx = document.getElementById('classChart').getContext('2d');
+            
+            // Уничтожаем предыдущий график, если он есть
+            if (classChart) {
+                classChart.destroy();
+            }
+            
+            classChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: subjects,
+                    datasets: [
+                        {
+                            label: 'Оценка 2',
+                            data: gradeCounts['2'],
+                            backgroundColor: '#e74c3c'
+                        },
+                        {
+                            label: 'Оценка 3',
+                            data: gradeCounts['3'],
+                            backgroundColor: '#f1c40f'
+                        },
+                        {
+                            label: 'Оценка 4',
+                            data: gradeCounts['4'],
+                            backgroundColor: '#3498db'
+                        },
+                        {
+                            label: 'Оценка 5',
+                            data: gradeCounts['5'],
+                            backgroundColor: '#2ecc71'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Статистика оценок для класса ${selectedClass}`
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Количество оценок'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Предметы'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function countGrades(data, subject, grade) {
+            return data.filter(item => item[subject] === grade).length;
+        }
+
+        function renderStatChart() {
+            // По предметам (все классы)
+            let bySubject = {};
+            subjects.forEach(s=>bySubject[s]=[]);
+            journal.forEach(r=>{
+                subjects.forEach(s=>bySubject[s].push(r[s]));
+            });
+            let labels = subjects;
+            let data2 = labels.map(s => count(bySubject[s],2));
+            let data3 = labels.map(s => count(bySubject[s],3));
+            let data4 = labels.map(s => count(bySubject[s],4));
+            let data5 = labels.map(s => count(bySubject[s],5));
+            let ctx = document.getElementById('statChart').getContext('2d');
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {label:'Оценка 2', data:data2, backgroundColor:'#e74c3c'},
+                        {label:'Оценка 3', data:data3, backgroundColor:'#f1c40f'},
+                        {label:'Оценка 4', data:data4, backgroundColor:'#3498db'},
+                        {label:'Оценка 5', data:data5, backgroundColor:'#2ecc71'},
+                    ]
+                },
+                options: {
+                    responsive:true,
+                    plugins: {legend:{position:'top'}},
+                    scales: {y:{beginAtZero:true, stepSize:1}}
+                }
+            });
+        }
+
+        // Вспомогательные функции
+        function avg(arr) { if(!arr.length) return 0; return arr.reduce((a,b)=>a+b,0)/arr.length; }
+        function median(arr) {
+            if(!arr.length) return 0;
+            arr = arr.slice().sort((a,b)=>a-b);
+            let m = Math.floor(arr.length/2);
+            return arr.length%2 ? arr[m] : ((arr[m-1]+arr[m])/2).toFixed(2);
+        }
+        function count(arr, val) { return arr.filter(x=>x===val).length; }
+        function perc(arr, val) { return arr.length ? Math.round(100*count(arr,val)/arr.length) : 0; }
+    </script>
+</body>
+</html>
